@@ -1,0 +1,3 @@
+#!/bin/bash
+
+curl -sf localhost/health_check
