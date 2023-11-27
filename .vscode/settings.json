@@ -1,6 +1,12 @@
 {
   "files.associations": {
     "unistd.h": "c",
-    "options.h": "c"
+    "options.h": "c",
+    "stdio.h": "c",
+    "signal.h": "c",
+    "types.h": "c",
+    "stdlib.h": "c",
+    "string.h": "c",
+    "time.h": "c"
   }
 }

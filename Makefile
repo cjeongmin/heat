@@ -1,17 +1,23 @@
 CC = gcc
-OUT = heat
+SRC_DIR = ./src
+OBJ_DIR = ./build
+TARGET = heat
+SRCS = $(notdir $(wildcard $(SRC_DIR)/*.c))
+OBJS = $(SRCS:.c=.o)
+OBJECTS = $(patsubst %.o,$(OBJ_DIR)/%.o,$(OBJS))
+DEPS = $(OBJECTS:.o=.d)
 
-all: main.o
-	$(CC) -o $(OUT) main.o
+CFLAGS = -Wall -Wextra -pedantic -std=c11 -MMD -MP
+
+all: $(TARGET)
+
+$(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(TARGET) : $(OBJECTS)
+	$(CC) $(OBJECTS) -o $(TARGET)
 
 clean:
-	rm -f *.o heat
+	rm -f $(OBJECTS) $(DEPS) $(TARGET)
 
-%.o : %.cpp %.h
-	$(CC) -c $<
-
-%.o : %.cpp
-	$(CC) -c $<
-
-% : %.cpp
-	$(CC) -o $@ $<
+-include $(DEPS)
