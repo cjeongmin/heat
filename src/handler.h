@@ -2,6 +2,8 @@
 #define __HANDLER__
 
 #define _POSIX_C_SOURCE 200809L
+#include "options.h"
+
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

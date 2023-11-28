@@ -1,6 +1,7 @@
 #include "handler.h"
 
 extern FILE* logging_file;
+extern option* state;
 
 void sigchld_handler(int signo, siginfo_t* info) {
     if (signo != SIGCHLD) {
@@ -45,5 +46,12 @@ void sigchld_handler(int signo, siginfo_t* info) {
         fflush(logging_file);
         printf("Failed: Exit Code %d, details in heat.log\n",
                WEXITSTATUS(status));
+
+        if (kill(state->pid, state->signal) == -1) {
+            fprintf(stderr,
+                    "시그널을 보낼 프로세스가 없습니다. (pid: %d, %d)\n",
+                    state->pid, state->signal);
+            return;
+        }
     }
 }

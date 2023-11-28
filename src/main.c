@@ -5,7 +5,6 @@
 #include <sys/wait.h>
 
 #include "handler.h"
-#include "options.h"
 
 extern option* state;
 FILE* logging_file;
@@ -108,8 +107,6 @@ int main(int argc, char** argv) {
                 "검사 명령 또는 검사 스크립트는 반드시 주어져야 합니다.\n");
         exit(1);
     }
-
-    state->ppid = getppid();
 
     // 로깅을 위한 파일 생성,
     logging_file = fopen("heat.log", "w");

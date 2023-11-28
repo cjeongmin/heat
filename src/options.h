@@ -3,6 +3,7 @@
 
 #include <dirent.h>
 #include <getopt.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +22,8 @@
 #define SUCCESS_SIGNAL 'u'
 
 typedef struct {
-    int ppid;
+    int pid;
+    int signal;
     int end_of_option;
     int interval;
     char* script_path;
@@ -31,5 +33,6 @@ typedef struct {
 int find_end_of_option(int, char**);
 char* concat(int, char**);
 option* parse_optarg(int, char**);
+int get_signal(char*);
 
 #endif
