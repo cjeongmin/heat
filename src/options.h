@@ -1,10 +1,12 @@
 #ifndef __OPTIONS__
 #define __OPTIONS__
 
+#include <dirent.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #define INTERVAL 'i'
@@ -19,14 +21,15 @@
 #define SUCCESS_SIGNAL 'u'
 
 typedef struct {
+    int ppid;
     int end_of_option;
     int interval;
-    char *target;
-    char *script_path;
+    char* script_path;
+    char** inspection_command;
 } option;
 
-int find_end_of_option(int, char **);
-char *concat(int, char **);
-option *parse_optarg(int, char **);
+int find_end_of_option(int, char**);
+char* concat(int, char**);
+option* parse_optarg(int, char**);
 
 #endif
