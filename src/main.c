@@ -6,7 +6,7 @@
 
 #include "handler.h"
 
-extern option* state;
+extern State* state;
 FILE* logging_file;
 
 void exec_action() {

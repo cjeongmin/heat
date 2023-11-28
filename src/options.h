@@ -28,11 +28,12 @@ typedef struct {
     int interval;
     char* script_path;
     char** inspection_command;
-} option;
+    char* failure_script_path;
+} State;
 
 int find_end_of_option(int, char**);
 char* concat(int, char**);
-option* parse_optarg(int, char**);
+State* parse_optarg(int, char**);
 int get_signal(char*);
 
 #endif

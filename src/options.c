@@ -1,6 +1,6 @@
 #include "options.h"
 
-option* state = NULL;
+State* state = NULL;
 
 static struct option long_options[] = {
     {"pid", required_argument, 0, PID},
@@ -50,14 +50,17 @@ char* concat(int size, char** arr) {
     return res;
 }
 
-option* parse_optarg(int argc, char** argv) {
+State* parse_optarg(int argc, char** argv) {
     extern char* optarg;
     extern int optind, opterr, optopt;
 
-    option* ret = malloc(sizeof(option));
+    State* ret = (State*)malloc(sizeof(State));
+    ret->pid = 0;
+    ret->signal = SIGHUP;
     ret->interval = 0;
     ret->script_path = NULL;
-    ret->signal = SIGHUP;
+    ret->inspection_command = NULL;
+    ret->failure_script_path = NULL;
 
     int n;
     ret->end_of_option = find_end_of_option(argc, argv);
@@ -85,6 +88,9 @@ option* parse_optarg(int argc, char** argv) {
             break;
         case SINGAL:
             ret->signal = get_signal(optarg);
+            break;
+        case FAIL:
+            ret->failure_script_path = optarg;
             break;
         }
     }
