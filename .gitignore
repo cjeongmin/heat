@@ -4,3 +4,6 @@ test
 test.c
 .DS_Store
 heat.log
+
+./build
+heat
