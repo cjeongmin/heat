@@ -61,9 +61,13 @@ State* parse_optarg(int argc, char** argv) {
     ret->script_path = NULL;
     ret->inspection_command = NULL;
     ret->failure_script_path = NULL;
+    ret->is_failure_script_running = 0;
 
     int n;
     ret->end_of_option = find_end_of_option(argc, argv);
+
+    time_t tt;
+    FILE* check;
     while ((n = getopt_long(ret->end_of_option, argv, "i:s:", long_options,
                             NULL)) != -1) {
         switch (n) {
@@ -78,6 +82,21 @@ State* parse_optarg(int argc, char** argv) {
             break;
         case SCRIPT:
             ret->script_path = optarg;
+            if ((check = fopen(ret->script_path, "r")) == NULL) {
+                time(&tt);
+                fprintf(stderr,
+                        "[%d](%d): 스크립트의 경로가 올바른지 확인해주세요.\n",
+                        (unsigned int)tt, getpid());
+                return NULL;
+            }
+            fclose(check);
+
+            if (access(ret->script_path, X_OK | F_OK)) {
+                time(&tt);
+                fprintf(stderr, "[%d](%d): 스크립트 실행 권한이 없습니다.\n",
+                        (unsigned int)tt, getpid());
+                return NULL;
+            }
             break;
         case PID:
             ret->pid = atoi(optarg);
@@ -91,6 +110,23 @@ State* parse_optarg(int argc, char** argv) {
             break;
         case FAIL:
             ret->failure_script_path = optarg;
+            if ((check = fopen(ret->failure_script_path, "r")) == NULL) {
+                time(&tt);
+                fprintf(
+                    stderr,
+                    "[%d](%d): 실패 스크립트의 경로가 올바른지 확인해주세요.\n",
+                    (unsigned int)tt, getpid());
+                return NULL;
+            }
+            fclose(check);
+
+            if (access(ret->failure_script_path, X_OK | F_OK)) {
+                time(&tt);
+                fprintf(stderr,
+                        "[%d](%d): 실패 스크립트 실행 권한이 없습니다.\n",
+                        (unsigned int)tt, getpid());
+                return NULL;
+            }
             break;
         }
     }

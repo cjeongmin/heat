@@ -3,6 +3,25 @@
 extern FILE* logging_file;
 extern State* state;
 
+void exec_failure_script() {
+    pid_t pid;
+    time_t tt;
+    if ((pid = fork()) == 0) {
+        if (execl(state->failure_script_path, state->failure_script_path,
+                  NULL) == -1) {
+            time(&tt);
+            fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
+                    (unsigned int)tt, getpid());
+        }
+        exit(1);
+    } else {
+        struct sigaction action;
+        sigfillset(&action.sa_mask);
+        sigdelset(&action.sa_mask, SIGCHLD);
+        sigsuspend(&action.sa_mask);
+    }
+}
+
 void sigchld_handler(int signo, siginfo_t* info) {
     if (signo != SIGCHLD) {
         return;
@@ -55,5 +74,9 @@ void sigchld_handler(int signo, siginfo_t* info) {
                     state->pid, state->signal);
             return;
         }
+    }
+
+    if (state->failure_script_path != NULL) {
+        exec_failure_script();
     }
 }

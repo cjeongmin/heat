@@ -1,7 +1,6 @@
 #ifndef __OPTIONS__
 #define __OPTIONS__
 
-#include <dirent.h>
 #include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
@@ -9,6 +8,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
 #define INTERVAL 'i'
 #define SCRIPT 's'
@@ -29,6 +30,7 @@ typedef struct {
     char* script_path;
     char** inspection_command;
     char* failure_script_path;
+    int is_failure_script_running;
 } State;
 
 int find_end_of_option(int, char**);

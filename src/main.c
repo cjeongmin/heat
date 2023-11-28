@@ -29,26 +29,9 @@ void exec_action() {
             }
         } else {
             // 스크립트 실행
-            FILE* check;
-            if ((check = fopen(state->script_path, "r")) == NULL) {
+            if (execl(state->script_path, state->script_path, NULL) == -1) {
                 time(&tt);
-                fprintf(stderr,
-                        "[%d](%d): 스크립트의 경로가 올바른지 확인해주세요.\n",
-                        (unsigned int)tt, getpid());
-                exit(1);
-            }
-            fclose(check);
-
-            if (access(state->script_path, X_OK | F_OK) == 0) {
-                if (execl(state->script_path, state->script_path, NULL) == -1) {
-                    time(&tt);
-                    fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
-                            (unsigned int)tt, getpid());
-                    exit(1);
-                }
-            } else {
-                time(&tt);
-                fprintf(stderr, "[%d](%d): 스크립트 실행 권한이 없습니다.\n",
+                fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
                         (unsigned int)tt, getpid());
                 exit(1);
             }
