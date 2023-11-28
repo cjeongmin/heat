@@ -15,11 +15,11 @@ void exec_action() {
     char buffer[128];
 
     if ((pid = fork()) == 0) {
+        dup2(fileno(logging_file), STDOUT_FILENO);
+        dup2(fileno(logging_file), STDERR_FILENO);
+
         if (state->script_path == NULL) {
             // 검사 명령 실행
-            dup2(fileno(logging_file), STDOUT_FILENO);
-            dup2(fileno(logging_file), STDERR_FILENO);
-
             sprintf(buffer, "/bin/%s", state->inspection_command[0]);
             if (execv(buffer, state->inspection_command) == -1) {
                 time_t tt;
@@ -31,6 +31,16 @@ void exec_action() {
             }
         } else {
             // 스크립트 실행
+            if (access(state->script_path, X_OK) == 0) {
+                if (execl(state->script_path, state->script_path, NULL) == -1) {
+                    time_t tt;
+                    time(&tt);
+
+                    fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
+                            (unsigned int)tt, getpid());
+                    exit(1);
+                }
+            }
         }
     }
 }
