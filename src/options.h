@@ -2,6 +2,10 @@
 #define __OPTIONS__
 
 #include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
 
 #define INTERVAL 'i'
 #define SCRIPT 's'
@@ -14,15 +18,15 @@
 #define FAULT_SIGNAL 'f'
 #define SUCCESS_SIGNAL 'u'
 
-static struct option long_options[] = {
-    {"pid", required_argument, 0, PID},
-    {"signal", required_argument, 0, SINGAL},
-    {"fail", required_argument, 0, FAIL},
-    {"threshold", required_argument, 0, THRESHOLD},
-    {"recovery", required_argument, 0, RECOVERY},
-    {"recovery-timeout", required_argument, 0, RECOVERY_TIMEOUT},
-    {"fault-signal", required_argument, 0, FAULT_SIGNAL},
-    {"success-signal", required_argument, 0, SUCCESS_SIGNAL},
-    {0, 0, 0, 0}};
+typedef struct {
+    int end_of_option;
+    int interval;
+    char *target;
+    char *script_path;
+} option;
+
+int find_end_of_option(int, char **);
+char *concat(int, char **);
+option *parse_optarg(int, char **);
 
 #endif
