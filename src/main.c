@@ -17,14 +17,13 @@ void exec_action() {
     if ((pid = fork()) == 0) {
         dup2(fileno(logging_file), STDOUT_FILENO);
         dup2(fileno(logging_file), STDERR_FILENO);
+        time_t tt;
 
         if (state->script_path == NULL) {
             // 검사 명령 실행
             sprintf(buffer, "/bin/%s", state->inspection_command[0]);
             if (execv(buffer, state->inspection_command) == -1) {
-                time_t tt;
                 time(&tt);
-
                 fprintf(stderr, "[%d](%d): 검사 명령 실행에 실패했습니다.\n",
                         (unsigned int)tt, getpid());
                 exit(1);
@@ -33,24 +32,26 @@ void exec_action() {
             // 스크립트 실행
             FILE* check;
             if ((check = fopen(state->script_path, "r")) == NULL) {
-                time_t tt;
                 time(&tt);
-
-                fprintf(stderr, "[%d](%d): 스크립트가 올바른지 확인해주세요.\n",
+                fprintf(stderr,
+                        "[%d](%d): 스크립트의 경로가 올바른지 확인해주세요.\n",
                         (unsigned int)tt, getpid());
                 exit(1);
             }
             fclose(check);
 
-            if (access(state->script_path, X_OK) == 0) {
+            if (access(state->script_path, X_OK | F_OK) == 0) {
                 if (execl(state->script_path, state->script_path, NULL) == -1) {
-                    time_t tt;
                     time(&tt);
-
                     fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
                             (unsigned int)tt, getpid());
                     exit(1);
                 }
+            } else {
+                time(&tt);
+                fprintf(stderr, "[%d](%d): 스크립트 실행 권한이 없습니다.\n",
+                        (unsigned int)tt, getpid());
+                exit(1);
             }
         }
     }
@@ -98,8 +99,16 @@ int main(int argc, char** argv) {
     state = parse_optarg(argc, argv);
 
     if (state == NULL) {
+        fprintf(stderr, "HEAT option을 파싱하지 못했습니다.\n");
         exit(1);
     }
+
+    if (state->inspection_command == NULL && state->script_path == NULL) {
+        fprintf(stderr,
+                "검사 명령 또는 검사 스크립트는 반드시 주어져야 합니다.\n");
+        exit(1);
+    }
+
     state->ppid = getppid();
 
     // 로깅을 위한 파일 생성,
