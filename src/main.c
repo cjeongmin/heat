@@ -31,6 +31,17 @@ void exec_action() {
             }
         } else {
             // 스크립트 실행
+            FILE* check;
+            if ((check = fopen(state->script_path, "r")) == NULL) {
+                time_t tt;
+                time(&tt);
+
+                fprintf(stderr, "[%d](%d): 스크립트가 올바른지 확인해주세요.\n",
+                        (unsigned int)tt, getpid());
+                exit(1);
+            }
+            fclose(check);
+
             if (access(state->script_path, X_OK) == 0) {
                 if (execl(state->script_path, state->script_path, NULL) == -1) {
                     time_t tt;
