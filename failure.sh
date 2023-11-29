@@ -1,4 +1,4 @@
 #!/bin/bash
-echo "FAILURE SCRIPT"
+echo $HEAT_FAIL_PID
 sleep 10
 
