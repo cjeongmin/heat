@@ -10,20 +10,22 @@ void exec_failure_script() {
         if (execl(state->failure_script_path, state->failure_script_path,
                   NULL) == -1) {
             time(&tt);
-            fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
+            fprintf(stderr, "[%d](%d): 실패 스크립트 실행에 실패했습니다.\n",
                     (unsigned int)tt, getpid());
         }
         exit(1);
     } else {
+        state->failure_script_pid = pid;
         struct sigaction action;
         sigfillset(&action.sa_mask);
         sigdelset(&action.sa_mask, SIGCHLD);
+        sigdelset(&action.sa_mask, SIGINT);
         sigsuspend(&action.sa_mask);
     }
 }
 
 void sigchld_handler(int signo, siginfo_t* info) {
-    if (signo != SIGCHLD) {
+    if (signo != SIGCHLD || info->si_pid == state->failure_script_pid) {
         return;
     }
     time_t tt;
@@ -33,7 +35,7 @@ void sigchld_handler(int signo, siginfo_t* info) {
     while (waitpid(-1, &status, WNOHANG) > 0) {
     }
 
-    printf("%d: ", (unsigned int)tt);
+    printf("[%d](%d): ", (unsigned int)tt, info->si_pid);
 
     if (status == 0) { // success
         printf("OK\n");

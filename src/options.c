@@ -61,7 +61,7 @@ State* parse_optarg(int argc, char** argv) {
     ret->script_path = NULL;
     ret->inspection_command = NULL;
     ret->failure_script_path = NULL;
-    ret->is_failure_script_running = 0;
+    ret->failure_script_pid = 0;
 
     int n;
     ret->end_of_option = find_end_of_option(argc, argv);

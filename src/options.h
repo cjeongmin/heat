@@ -29,8 +29,8 @@ typedef struct {
     int interval;
     char* script_path;
     char** inspection_command;
+    int failure_script_pid;
     char* failure_script_path;
-    int is_failure_script_running;
 } State;
 
 int find_end_of_option(int, char**);
