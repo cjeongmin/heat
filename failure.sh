@@ -1,4 +1,5 @@
 #!/bin/bash
 echo $HEAT_FAIL_PID
-sleep 10
-
+echo $HEAT_FAIL_CODE
+echo $HEAT_FAIL_TIME
+echo $HEAT_FAIL_INTERVAL

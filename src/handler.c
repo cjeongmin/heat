@@ -35,6 +35,7 @@ void exec_failure_script(pid_t fail_pid, int exit_code, unsigned int unixtime,
         sigdelset(&action.sa_mask, SIGQUIT);
         sigdelset(&action.sa_mask, SIGSTOP);
         sigsuspend(&action.sa_mask);
+        waitpid(pid, NULL, 0);
     }
 }
 
