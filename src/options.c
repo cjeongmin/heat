@@ -55,25 +55,40 @@ State* parse_optarg(int argc, char** argv) {
     extern int optind, opterr, optopt;
 
     State* ret = (State*)malloc(sizeof(State));
-    ret->pid = 0;
-    ret->signal = SIGHUP;
-    ret->interval = 0;
-    ret->script_path = NULL;
-    ret->inspection_command = NULL;
-    ret->failure_script_path = NULL;
-    ret->failure_script_pid = 0;
 
-    int n;
     ret->end_of_option = find_end_of_option(argc, argv);
 
+    ret->interval = 0;
+
+    ret->script_path = NULL;
+    ret->inspection_command = NULL;
+
+    ret->pid = 0;
+    ret->signal = SIGHUP;
+
+    ret->fail_state = (FailState*)malloc(sizeof(FailState));
+
+    ret->failure_script_path = NULL;
+    ret->failure_script_pid = 0;
+    ret->failure_count = 0;
+
+    ret->threshold = 0;
+    ret->recovery_script_path = NULL;
+    ret->recovery_script_pid = 0;
+    ret->recovery_timeout_timer_pid = 0;
+    ret->recovery_timeout = 0;
+    ret->recovery_script_executed = 0;
+
+    int n;
     time_t tt;
+    time(&tt);
     FILE* check;
     while ((n = getopt_long(ret->end_of_option, argv, "i:s:", long_options,
                             NULL)) != -1) {
         switch (n) {
         case INTERVAL:
             ret->interval = atoi(optarg);
-            if (ret->interval == 0) {
+            if (ret->interval <= 0) {
                 // 숫자로 변환에 실패하거나 0인 경우
                 fprintf(stderr,
                         "Interval의 값은 0보다 큰 숫자이여야 합니다.\n");
@@ -83,7 +98,6 @@ State* parse_optarg(int argc, char** argv) {
         case SCRIPT:
             ret->script_path = optarg;
             if ((check = fopen(ret->script_path, "r")) == NULL) {
-                time(&tt);
                 fprintf(stderr,
                         "[%d](%d): 스크립트의 경로가 올바른지 확인해주세요.\n",
                         (unsigned int)tt, getpid());
@@ -92,7 +106,6 @@ State* parse_optarg(int argc, char** argv) {
             fclose(check);
 
             if (access(ret->script_path, X_OK | F_OK)) {
-                time(&tt);
                 fprintf(stderr, "[%d](%d): 스크립트 실행 권한이 없습니다.\n",
                         (unsigned int)tt, getpid());
                 return NULL;
@@ -111,7 +124,6 @@ State* parse_optarg(int argc, char** argv) {
         case FAIL:
             ret->failure_script_path = optarg;
             if ((check = fopen(ret->failure_script_path, "r")) == NULL) {
-                time(&tt);
                 fprintf(
                     stderr,
                     "[%d](%d): 실패 스크립트의 경로가 올바른지 확인해주세요.\n",
@@ -121,10 +133,42 @@ State* parse_optarg(int argc, char** argv) {
             fclose(check);
 
             if (access(ret->failure_script_path, X_OK | F_OK)) {
-                time(&tt);
                 fprintf(stderr,
                         "[%d](%d): 실패 스크립트 실행 권한이 없습니다.\n",
                         (unsigned int)tt, getpid());
+                return NULL;
+            }
+            break;
+        case RECOVERY:
+            ret->recovery_script_path = optarg;
+            if ((check = fopen(ret->recovery_script_path, "r")) == NULL) {
+                fprintf(
+                    stderr,
+                    "[%d](%d): 복구 스크립트의 경로가 올바른지 확인해주세요.\n",
+                    (unsigned int)tt, getpid());
+                return NULL;
+            }
+            fclose(check);
+
+            if (access(ret->recovery_script_path, X_OK | F_OK)) {
+                fprintf(stderr,
+                        "[%d](%d): 복구 스크립트 실행 권한이 없습니다.\n",
+                        (unsigned int)tt, getpid());
+                return NULL;
+            }
+            break;
+        case THRESHOLD:
+            ret->threshold = atoi(optarg);
+            if (ret->threshold <= 0) {
+                fprintf(stderr, "threshold 값은 0보다 큰 숫자이여야 합니다.\n");
+                return NULL;
+            }
+            break;
+        case RECOVERY_TIMEOUT:
+            ret->recovery_timeout = atoi(optarg);
+            if (ret->recovery_timeout <= 0) {
+                fprintf(stderr,
+                        "recovery timeout 값은 0보다 큰 숫자이여야 합니다.\n");
                 return NULL;
             }
             break;

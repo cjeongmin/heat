@@ -22,15 +22,39 @@
 #define FAULT_SIGNAL 'f'
 #define SUCCESS_SIGNAL 'u'
 
-typedef struct {
-    int pid;
-    int signal;
-    int end_of_option;
+typedef struct FailState {
+    pid_t pid;
+    int exit_code;
+    unsigned int first_time;
+    unsigned int last_time;
     int interval;
+    int fail_cnt;
+} FailState;
+
+typedef struct State {
+    int end_of_option;
+
+    int interval;
+
     char* script_path;
     char** inspection_command;
-    int failure_script_pid;
+
+    int pid;
+    int signal;
+
+    FailState* fail_state;
+
     char* failure_script_path;
+    pid_t failure_script_pid;
+    int failure_count;
+
+    int threshold;
+    char* recovery_script_path;
+    pid_t recovery_script_pid;
+    pid_t recovery_timeout_timer_pid;
+    int recovery_timeout;
+    int recovery_script_executed;
+    int recovery_script_ended;
 } State;
 
 int find_end_of_option(int, char**);

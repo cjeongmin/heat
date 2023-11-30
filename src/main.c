@@ -17,12 +17,12 @@ void exec_action() {
         dup2(fileno(logging_file), STDOUT_FILENO);
         dup2(fileno(logging_file), STDERR_FILENO);
         time_t tt;
+        time(&tt);
 
         if (state->script_path == NULL) {
             // 검사 명령 실행
             sprintf(buffer, "/bin/%s", state->inspection_command[0]);
             if (execv(buffer, state->inspection_command) == -1) {
-                time(&tt);
                 fprintf(stderr, "[%d](%d): 검사 명령 실행에 실패했습니다.\n",
                         (unsigned int)tt, getpid());
                 exit(1);
@@ -30,7 +30,6 @@ void exec_action() {
         } else {
             // 스크립트 실행
             if (execl(state->script_path, state->script_path, NULL) == -1) {
-                time(&tt);
                 fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
                         (unsigned int)tt, getpid());
                 exit(1);
@@ -45,7 +44,7 @@ int set_timer() {
     action.sa_flags = 0;
     action.sa_handler = exec_action;
 
-    if (sigaction(SIGALRM, &action, (struct sigaction*)NULL) < 0) {
+    if (sigaction(SIGVTALRM, &action, (struct sigaction*)NULL) < 0) {
         fprintf(stderr, "알람 시그널 설정에 실패했습니다.\n");
         return 1;
     }
@@ -56,7 +55,7 @@ int set_timer() {
     timer.it_interval.tv_sec = state->interval;
     timer.it_interval.tv_usec = 0;
 
-    if (setitimer(ITIMER_REAL, &timer, (struct itimerval*)NULL) == -1) {
+    if (setitimer(ITIMER_VIRTUAL, &timer, (struct itimerval*)NULL) == -1) {
         fprintf(stderr, "타이머 설정에 실패했습니다.\n");
         return 1;
     }
@@ -65,15 +64,26 @@ int set_timer() {
 }
 
 int set_signal_handler() {
-    struct sigaction action;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = SA_SIGINFO;
-    action.sa_sigaction = sigchld_handler;
+    struct sigaction action1;
+    sigemptyset(&action1.sa_mask);
+    action1.sa_flags = SA_SIGINFO;
+    action1.sa_sigaction = sigchld_handler;
 
-    if (sigaction(SIGCHLD, &action, (struct sigaction*)NULL) < 0) {
+    if (sigaction(SIGCHLD, &action1, (struct sigaction*)NULL) < 0) {
         fprintf(stderr, "자식 시그널 설정에 실패했습니다.\n");
         return 1;
     }
+
+    struct sigaction action2;
+    sigemptyset(&action2.sa_mask);
+    action2.sa_flags = SA_SIGINFO;
+    action2.sa_sigaction = timeout_handler;
+
+    if (sigaction(SIGUSR1, &action2, (struct sigaction*)NULL) < 0) {
+        fprintf(stderr, "복구 시간초과 시그널 설정에 실패했습니다.\n");
+        return 1;
+    }
+
     return 0;
 }
 
