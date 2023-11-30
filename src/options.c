@@ -4,7 +4,7 @@ State* state = NULL;
 
 static struct option long_options[] = {
     {"pid", required_argument, 0, PID},
-    {"signal", required_argument, 0, SINGAL},
+    {"signal", required_argument, 0, SIGNAL},
     {"fail", required_argument, 0, FAIL},
     {"threshold", required_argument, 0, THRESHOLD},
     {"recovery", required_argument, 0, RECOVERY},
@@ -79,6 +79,9 @@ State* parse_optarg(int argc, char** argv) {
     ret->recovery_timeout = 0;
     ret->recovery_script_executed = 0;
 
+    ret->fault_signal = 0;
+    ret->success_signal = 0;
+
     int n;
     time_t tt;
     time(&tt);
@@ -118,8 +121,12 @@ State* parse_optarg(int argc, char** argv) {
                 return NULL;
             }
             break;
-        case SINGAL:
+        case SIGNAL:
             ret->signal = get_signal(optarg);
+            if (ret->signal == -1) {
+                fprintf(stderr, "알 수 없는 시그널입니다.\n");
+                return NULL;
+            }
             break;
         case FAIL:
             ret->failure_script_path = optarg;
@@ -169,6 +176,20 @@ State* parse_optarg(int argc, char** argv) {
             if (ret->recovery_timeout <= 0) {
                 fprintf(stderr,
                         "recovery timeout 값은 0보다 큰 숫자이여야 합니다.\n");
+                return NULL;
+            }
+            break;
+        case FAULT_SIGNAL:
+            ret->fault_signal = get_signal(optarg);
+            if (ret->fault_signal == -1) {
+                fprintf(stderr, "알 수 없는 시그널입니다.\n");
+                return NULL;
+            }
+            break;
+        case SUCCESS_SIGNAL:
+            ret->success_signal = get_signal(optarg);
+            if (ret->success_signal == -1) {
+                fprintf(stderr, "알 수 없는 시그널입니다.\n");
                 return NULL;
             }
             break;

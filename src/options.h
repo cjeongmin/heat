@@ -14,12 +14,12 @@
 #define INTERVAL 'i'
 #define SCRIPT 's'
 #define PID 'p'
-#define SINGAL 'n'
+#define SIGNAL 'n'
 #define FAIL 'f'
 #define THRESHOLD 't'
 #define RECOVERY 'r'
 #define RECOVERY_TIMEOUT 'e'
-#define FAULT_SIGNAL 'f'
+#define FAULT_SIGNAL 'a'
 #define SUCCESS_SIGNAL 'u'
 
 typedef struct FailState {
@@ -55,6 +55,9 @@ typedef struct State {
     int recovery_timeout;
     int recovery_script_executed;
     int recovery_script_ended;
+
+    int fault_signal;
+    int success_signal;
 } State;
 
 int find_end_of_option(int, char**);
