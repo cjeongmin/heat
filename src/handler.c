@@ -62,8 +62,17 @@ void exec_recovery_script(FailState* fail_state) {
         state->recovery_timeout_timer_pid = timer_pid;
     }
 
-    if ((pid = fork()) == 0) {
+    // send signal
+    if (state->pid != 0 && state->fault_signal != -1) {
+        if (kill(state->pid, state->fault_signal) == -1) {
+            fprintf(stderr,
+                    "시그널을 보낼 프로세스가 없습니다. (pid: %d, %d)\n",
+                    state->pid, state->signal);
+            return;
+        }
+    }
 
+    if ((pid = fork()) == 0) {
         char buffer[128];
         sprintf(buffer, "%d", fail_state->exit_code);
         setenv("HEAT_FAIL_CODE", buffer, 1);
@@ -199,6 +208,17 @@ void sigchld_handler(int signo, siginfo_t* info) {
     if (status == 0) { // success
         if (state->recovery_script_executed == 1) {
             state->recovery_script_executed = 0;
+
+            // send signal
+            if (state->pid != 0 && state->success_signal != -1) {
+                if (kill(state->pid, state->success_signal) == -1) {
+                    fprintf(
+                        stderr,
+                        "시그널을 보낼 프로세스가 없습니다. (pid: %d, %d)\n",
+                        state->pid, state->signal);
+                    return;
+                }
+            }
         }
 
         state->failure_count = 0;
@@ -225,32 +245,27 @@ void sigchld_handler(int signo, siginfo_t* info) {
                 info->si_pid, str_status, WEXITSTATUS(status));
         fflush(logging_file);
 
-        // send signal
-        if (state->pid != 0 && state->signal != -1) {
-            if (kill(state->pid, state->signal) == -1) {
-                fprintf(stderr,
-                        "시그널을 보낼 프로세스가 없습니다. (pid: %d, %d)\n",
-                        state->pid, state->signal);
-                return;
-            }
-        }
-
         if (state->recovery_script_executed == 0) {
             if (state->failure_count >= state->threshold &&
                 state->recovery_script_path != NULL) {
                 exec_recovery_script(state->fail_state);
             } else if (state->failure_script_path != NULL) {
+                // send signal
+                if (state->pid != 0 && state->signal != -1) {
+                    if (kill(state->pid, state->signal) == -1) {
+                        fprintf(stderr,
+                                "시그널을 보낼 프로세스가 없습니다. (pid: %d, "
+                                "%d)\n",
+                                state->pid, state->signal);
+                        return;
+                    }
+                }
                 // execute failure script
                 exec_failure_script(state->fail_state);
             }
         } else if (state->recovery_script_executed == 1 &&
                    state->recovery_timeout == 0 &&
                    state->failure_count % state->threshold == 0) {
-            printf("THRESHOLD\n");
-            printf("THRESHOLD\n");
-            printf("THRESHOLD\n");
-            printf("THRESHOLD\n");
-            printf("THRESHOLD\n");
             exec_recovery_script(state->fail_state);
         }
     }

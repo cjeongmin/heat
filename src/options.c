@@ -64,7 +64,7 @@ State* parse_optarg(int argc, char** argv) {
     ret->inspection_command = NULL;
 
     ret->pid = 0;
-    ret->signal = SIGHUP;
+    ret->signal = SIGINT;
 
     ret->fail_state = (FailState*)malloc(sizeof(FailState));
 

@@ -1,2 +1,2 @@
 #!/bin/bash
-curl -sf localhost
+echo ECHO IN SCRIPT
