@@ -1,14 +1,14 @@
 #ifndef __OPTIONS__
 #define __OPTIONS__
 
+#ifndef POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-#include <time.h>
 #include <unistd.h>
 
 #define INTERVAL 'i'
@@ -61,7 +61,6 @@ typedef struct State {
 } State;
 
 int find_end_of_option(int, char**);
-char* concat(int, char**);
 State* parse_optarg(int, char**);
 int get_signal(char*);
 

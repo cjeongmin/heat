@@ -5,160 +5,68 @@
 #include <sys/wait.h>
 
 #include "handler.h"
+#include "options.h"
 
 extern State* state;
-FILE* logging_file;
-
-void exec_action() {
-    pid_t pid;
-    char buffer[128];
-
-    if ((pid = fork()) == 0) {
-        dup2(fileno(logging_file), STDOUT_FILENO);
-        dup2(fileno(logging_file), STDERR_FILENO);
-        time_t tt;
-        time(&tt);
-
-        if (state->script_path == NULL) {
-            // 검사 명령 실행
-            sprintf(buffer, "/bin/%s", state->inspection_command[0]);
-            if (execv(buffer, state->inspection_command) == -1) {
-                fprintf(stderr, "[%d](%d): 검사 명령 실행에 실패했습니다.\n",
-                        (unsigned int)tt, getpid());
-                exit(1);
-            }
-        } else {
-            // 스크립트 실행
-            if (execl(state->script_path, state->script_path, NULL) == -1) {
-                fprintf(stderr, "[%d](%d): 스크립트 실행에 실패했습니다.\n",
-                        (unsigned int)tt, getpid());
-                exit(1);
-            }
-        }
-    }
-}
-
-int set_timer() {
-    struct sigaction action;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-    action.sa_handler = exec_action;
-
-    if (sigaction(SIGVTALRM, &action, (struct sigaction*)NULL) < 0) {
-        fprintf(stderr, "알람 시그널 설정에 실패했습니다.\n");
-        return 1;
-    }
-
-    struct itimerval timer;
-    timer.it_value.tv_sec = state->interval;
-    timer.it_value.tv_usec = 0;
-    timer.it_interval.tv_sec = state->interval;
-    timer.it_interval.tv_usec = 0;
-
-    if (setitimer(ITIMER_VIRTUAL, &timer, (struct itimerval*)NULL) == -1) {
-        fprintf(stderr, "타이머 설정에 실패했습니다.\n");
-        return 1;
-    }
-
-    return 0;
-}
-
-int set_signal_handler() {
-    struct sigaction action1;
-    sigemptyset(&action1.sa_mask);
-    action1.sa_flags = SA_SIGINFO;
-    action1.sa_sigaction = sigchld_handler;
-
-    if (sigaction(SIGCHLD, &action1, (struct sigaction*)NULL) < 0) {
-        fprintf(stderr, "자식 시그널 설정에 실패했습니다.\n");
-        return 1;
-    }
-
-    struct sigaction action2;
-    sigemptyset(&action2.sa_mask);
-    action2.sa_flags = SA_SIGINFO;
-    action2.sa_sigaction = timeout_handler;
-
-    if (sigaction(SIGUSR1, &action2, (struct sigaction*)NULL) < 0) {
-        fprintf(stderr, "복구 시간초과 시그널 설정에 실패했습니다.\n");
-        return 1;
-    }
-
-    return 0;
-}
-
-int receiver_pid = 0;
-
-void heat_handler(int signo, siginfo_t* info) {
-    if (signo != SIGCHLD) {
-        return;
-    }
-
-    int status;
-    while (waitpid(receiver_pid, &status, WNOHANG) > 0) {
-    }
-
-    if (WIFSTOPPED(status)) {
-        fprintf(stderr, "[ERR]: SIGNAL RECEIVER IS STOPPED (EXIT_CODE: %d)\n",
-                WEXITSTATUS(status));
-        kill(getpgid(getpid()) * -1, SIGTERM);
-        exit(1);
-    }
-}
 
 int main(int argc, char** argv) {
-    pid_t pid;
+    state = parse_optarg(argc, argv);
 
-    switch ((pid = fork())) {
-    case 0:
-        prctl(PR_SET_NAME, "heat-receiver", 0, 0, 0);
-        state = parse_optarg(argc, argv);
-
-        if (state == NULL) {
-            fprintf(stderr, "HEAT option을 파싱하지 못했습니다.\n");
-            exit(1);
-        }
-
-        if (state->inspection_command == NULL && state->script_path == NULL) {
-            fprintf(stderr,
-                    "검사 명령 또는 검사 스크립트는 반드시 주어져야 합니다.\n");
-            exit(1);
-        }
-
-        // 로깅을 위한 파일 생성,
-        logging_file = fopen("heat.log", "w");
-        if (logging_file == NULL) {
-            fprintf(stderr, "heat.log 파일을 생성하는데 실패했습니다.\n");
-            exit(1);
-        }
-
-        set_signal_handler();
-        if (state->interval > 0) {
-            set_timer();
-        }
-        exec_action();
-
-        while (1) {
-        }
-
-        fclose(logging_file);
-        break;
-    default:
-        signal(SIGKILL, SIG_IGN);
-
-        receiver_pid = pid;
-        struct sigaction act;
-        sigemptyset(&act.sa_mask);
-        act.sa_flags = SA_SIGINFO;
-        act.sa_sigaction = heat_handler;
-
-        if (sigaction(SIGCHLD, &act, (struct sigaction*)NULL) < -1) {
-            exit(1);
-        }
-
-        while (1) {
-        }
-        break;
+    if (state == NULL) {
+        fprintf(stderr, "[ERROR](heat): 옵션 파싱 실패");
+        exit(1);
     }
+
+    int signo;
+    siginfo_t info;
+    sigset_t block_mask, sigset_mask;
+
+    sigfillset(&block_mask);
+    sigdelset(&block_mask, SIGQUIT);
+    sigdelset(&block_mask, SIGSTOP);
+    sigdelset(&block_mask, SIGTERM);
+    sigprocmask(SIG_SETMASK, &block_mask, NULL);
+
+    sigemptyset(&sigset_mask);
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        fprintf(stderr, "[ERROR](heat): fork error\n");
+        exit(1);
+    } else if (pid == 0) {
+        sigaddset(&sigset_mask, SIGCHLD);
+        sigaddset(&sigset_mask, SIGALRM);
+        sigaddset(&sigset_mask, SIGUSR1);
+
+        while (1) {
+            if ((signo = sigwaitinfo(&sigset_mask, &info)) == -1) {
+                fprintf(stderr, "[ERROR](receiver): sigwaitinfo error\n");
+                exit(1);
+            }
+
+            if (signo == SIGCHLD) {
+
+            } else if (signo == SIGALRM) {
+
+            } else if (signo == SIGUSR1) {
+            }
+        }
+
+    } else {
+        sigaddset(&sigset_mask, SIGCHLD);
+        sigaddset(&sigset_mask, SIGVTALRM);
+
+        while (1) {
+            if ((signo = sigwaitinfo(&sigset_mask, &info)) == -1) {
+                fprintf(stderr, "[ERROR]: heat sigwaitinfo error\n");
+                exit(1);
+            }
+
+            if (signo == SIGCHLD) {
+            } else if (signo == SIGVTALRM) {
+            }
+        }
+    }
+
     return 0;
 }

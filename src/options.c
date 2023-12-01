@@ -38,24 +38,6 @@ int find_end_of_option(int argc, char** argv) {
     return argc;
 }
 
-char* concat(int size, char** arr) {
-    int length = size - 1;
-    for (int i = 0; i < size; i++) {
-        length += strlen(arr[i]);
-    }
-
-    int p = 0;
-    char* res = malloc(sizeof(char) * length + 1);
-    for (int i = 0; i < size; i++) {
-        for (size_t j = 0; j < strlen(arr[i]); j++) {
-            res[p++] = arr[i][j];
-        }
-        res[p++] = ' ';
-    }
-    res[length] = '\0';
-    return res;
-}
-
 State* parse_optarg(int argc, char** argv) {
     extern char* optarg;
     extern int optind, opterr, optopt;
