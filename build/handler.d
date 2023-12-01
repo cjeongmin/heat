@@ -1,3 +1,2 @@
-build/handler.o: src/handler.c src/handler.h src/options.h
+build/handler.o: src/handler.c src/handler.h
 src/handler.h:
-src/options.h:
