@@ -78,8 +78,8 @@ int main(int argc, char** argv) {
                             exit(1);
                         }
                     } else {
-                        if (execve(state->inspection_command[0],
-                                   state->inspection_command, environ) == -1) {
+                        if (execvp(state->inspection_command[0],
+                                   state->inspection_command) == -1) {
                             perror("[ERROR](wrapper)");
                             exit(1);
                         }
