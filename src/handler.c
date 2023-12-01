@@ -185,7 +185,7 @@ void sigchld_handler(int signo, siginfo_t* info) {
     time(&tt);
 
     int status;
-    while (waitpid(0, &status, WNOHANG) > 0) {
+    while (waitpid(-1, &status, WNOHANG) > 0) {
     }
 
     if (signo != SIGCHLD || info->si_pid == state->failure_script_pid ||
