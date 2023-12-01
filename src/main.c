@@ -87,36 +87,78 @@ int set_signal_handler() {
     return 0;
 }
 
+int receiver_pid = 0;
+
+void heat_handler(int signo, siginfo_t* info) {
+    if (signo != SIGCHLD) {
+        return;
+    }
+
+    int status;
+    while (waitpid(receiver_pid, &status, WNOHANG) > 0) {
+    }
+
+    if (WIFSTOPPED(status)) {
+        fprintf(stderr, "[ERR]: SIGNAL RECEIVER IS STOPPED (EXIT_CODE: %d)\n",
+                WEXITSTATUS(status));
+        kill(getpgid(getpid()) * -1, SIGTERM);
+        exit(1);
+    }
+}
+
 int main(int argc, char** argv) {
-    state = parse_optarg(argc, argv);
+    pid_t pid;
 
-    if (state == NULL) {
-        fprintf(stderr, "HEAT option을 파싱하지 못했습니다.\n");
-        exit(1);
+    switch ((pid = fork())) {
+    case 0:
+        prctl(PR_SET_NAME, "heat-receiver", 0, 0, 0);
+        state = parse_optarg(argc, argv);
+
+        if (state == NULL) {
+            fprintf(stderr, "HEAT option을 파싱하지 못했습니다.\n");
+            exit(1);
+        }
+
+        if (state->inspection_command == NULL && state->script_path == NULL) {
+            fprintf(stderr,
+                    "검사 명령 또는 검사 스크립트는 반드시 주어져야 합니다.\n");
+            exit(1);
+        }
+
+        // 로깅을 위한 파일 생성,
+        logging_file = fopen("heat.log", "w");
+        if (logging_file == NULL) {
+            fprintf(stderr, "heat.log 파일을 생성하는데 실패했습니다.\n");
+            exit(1);
+        }
+
+        set_signal_handler();
+        if (state->interval > 0) {
+            set_timer();
+        }
+        exec_action();
+
+        while (1) {
+        }
+
+        fclose(logging_file);
+        break;
+    default:
+        signal(SIGKILL, SIG_IGN);
+
+        receiver_pid = pid;
+        struct sigaction act;
+        sigemptyset(&act.sa_mask);
+        act.sa_flags = SA_SIGINFO;
+        act.sa_sigaction = heat_handler;
+
+        if (sigaction(SIGCHLD, &act, (struct sigaction*)NULL) < -1) {
+            exit(1);
+        }
+
+        while (1) {
+        }
+        break;
     }
-
-    if (state->inspection_command == NULL && state->script_path == NULL) {
-        fprintf(stderr,
-                "검사 명령 또는 검사 스크립트는 반드시 주어져야 합니다.\n");
-        exit(1);
-    }
-
-    // 로깅을 위한 파일 생성,
-    logging_file = fopen("heat.log", "w");
-    if (logging_file == NULL) {
-        fprintf(stderr, "heat.log 파일을 생성하는데 실패했습니다.\n");
-        exit(1);
-    }
-
-    set_signal_handler();
-    if (state->interval > 0) {
-        set_timer();
-    }
-    exec_action();
-
-    while (1) {
-    }
-
-    fclose(logging_file);
     return 0;
 }

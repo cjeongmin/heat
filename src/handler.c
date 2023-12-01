@@ -181,7 +181,15 @@ void timeout_handler() {
 }
 
 void sigchld_handler(int signo, siginfo_t* info) {
-    if (signo != SIGCHLD || info->si_pid == state->failure_script_pid) {
+    time_t tt;
+    time(&tt);
+
+    int status;
+    while (waitpid(0, &status, WNOHANG) > 0) {
+    }
+
+    if (signo != SIGCHLD || info->si_pid == state->failure_script_pid ||
+        info->si_pid == state->recovery_timeout_timer_pid) {
         return;
     }
 
@@ -190,18 +198,21 @@ void sigchld_handler(int signo, siginfo_t* info) {
             kill(state->recovery_timeout_timer_pid, SIGKILL);
             state->recovery_timeout_timer_pid = 0;
         }
+
+        if (WIFSTOPPED(status)) {
+            fprintf(stderr, "[ERR]: RECOVERY SCRIPT STOPPED (EXIT_CODE: %d)\n",
+                    WEXITSTATUS(status));
+            kill(getpgid(getpid()) * -1, SIGTERM);
+            exit(1);
+        }
         return;
     }
 
-    time_t tt;
-    time(&tt);
-
-    int status;
-    while (waitpid(-1, &status, WNOHANG) > 0) {
-    }
-
-    if (info->si_pid == state->recovery_timeout_timer_pid) {
-        return;
+    if (WIFSTOPPED(status)) {
+        fprintf(stderr, "[ERR]: INSPECTION SCRIPT STOPPED (EXIT_CODE: %d)\n",
+                WEXITSTATUS(status));
+        kill(getpgid(getpid()) * -1, SIGTERM);
+        exit(1);
     }
 
     printf("[%d](%d): ", (unsigned int)tt, info->si_pid);
