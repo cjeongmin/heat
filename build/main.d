@@ -1,3 +1,3 @@
-build/main.o: src/main.c src/handler.h src/options.h
-src/handler.h:
+build/main.o: src/main.c src/options.h src/utils.h
 src/options.h:
+src/utils.h:

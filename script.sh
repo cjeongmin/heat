@@ -1,4 +1,3 @@
 #!/bin/bash
-echo ECHO IN SCRIPT
 
-sleep 3
+curl -sf localhost
