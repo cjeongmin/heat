@@ -1,6 +1,6 @@
 #include "options.h"
 
-State* state = NULL;
+HeatOption* option = NULL;
 
 static struct option long_options[] = {
     {"pid", required_argument, 0, PID},
@@ -38,11 +38,11 @@ int find_end_of_option(int argc, char** argv) {
     return argc;
 }
 
-State* parse_optarg(int argc, char** argv) {
+HeatOption* parse_optarg(int argc, char** argv) {
     extern char* optarg;
     extern int optind, opterr, optopt;
 
-    State* ret = (State*)malloc(sizeof(State));
+    HeatOption* ret = (HeatOption*)malloc(sizeof(HeatOption));
 
     ret->end_of_option = find_end_of_option(argc, argv);
 
@@ -52,20 +52,11 @@ State* parse_optarg(int argc, char** argv) {
     ret->inspection_command = NULL;
 
     ret->pid = 0;
-    ret->signal = SIGINT;
-
-    ret->fail_state = (FailState*)malloc(sizeof(FailState));
-
-    ret->failure_script_path = NULL;
-    ret->failure_script_pid = 0;
-    ret->failure_count = 0;
+    ret->signal = SIGHUP;
 
     ret->threshold = 0;
     ret->recovery_script_path = NULL;
-    ret->recovery_script_pid = 0;
-    ret->recovery_timeout_timer_pid = 0;
     ret->recovery_timeout = 0;
-    ret->recovery_script_executed = 0;
 
     ret->fault_signal = 0;
     ret->success_signal = 0;
