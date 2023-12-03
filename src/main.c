@@ -195,6 +195,19 @@ void heat_receiver() {
         if (signo == SIGCHLD) {
             waitpid(-1, NULL, 0);
 
+            if (strcmp(set_str_status(info.si_code), "stopped") == 0) {
+                if (info.si_pid == recovery_wrapper_pid) {
+                    fprintf(stderr, "[ERROR](receiver) 복구 프로세스가 "
+                                    "중단되어 종료합니다.\n");
+                } else {
+                    fprintf(stderr,
+                            "[ERROR](receiver) 검사 명령어 또는 프로세스가 "
+                            "중단되어 종료합니다.\n");
+                }
+                kill(getpgid(getpid()) * -1, SIGKILL);
+                exit(1);
+            }
+
             if (info.si_status == 0) {
                 if (info.si_pid != failure_wrapper_pid &&
                     info.si_pid != recovery_wrapper_pid) {
@@ -356,8 +369,13 @@ void heat_main(int receiver_pid) {
         }
 
         if (signo == SIGCHLD && info.si_pid == receiver_pid) {
-            fprintf(stderr,
-                    "[ERROR](heat): 시그널 수신 프로세스가 종료되었습니다.\n");
+            if (strcmp(set_str_status(info.si_code), "stopped") == 0) {
+                fprintf(
+                    stderr,
+                    "[ERROR](heat): 시그널 수신 프로세스가 중단되었습니다..\n");
+                kill(getpgid(getpid()) * -1, SIGKILL);
+                exit(1);
+            }
         } else if (signo == SIGALRM) {
             sigqueue(receiver_pid, SIGUSR1, payload);
         }
@@ -365,12 +383,6 @@ void heat_main(int receiver_pid) {
         if (waitpid(receiver_pid, &status, WNOHANG) == -1) {
             fprintf(stderr, "[ERROR](heat): 시그널 수신 프로세스에 문제가 "
                             "발생하여 종료합니다.\n");
-            exit(1);
-        }
-
-        if (WIFSTOPPED(status)) {
-            fprintf(stderr,
-                    "[ERROR](heat): 시그널 수신 프로세스가 중단되었습니다.\n");
             exit(1);
         }
     }
