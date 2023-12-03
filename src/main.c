@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
@@ -55,11 +56,45 @@ int main(int argc, char** argv) {
 }
 
 void make_wrapper(char* type) {
+    int fd_info[2], fd_err[2];
+    if (pipe(fd_info) == -1) {
+        perror("[ERROR](wrapper)");
+        exit(1);
+    }
+    if (pipe(fd_err) == -1) {
+        perror("[ERROR](wrapper)");
+        exit(1);
+    }
+
+    char* process_name;
+    if (strcmp(type, PR_WRAPPER) == 0) {
+        if (option->script_path != NULL) {
+            process_name = option->script_path;
+        } else {
+            process_name = option->inspection_command[0];
+        }
+    } else if (strcmp(type, PR_FAILURE) == 0) {
+        if (option->failure_script_path != NULL) {
+            process_name = option->failure_script_path;
+        }
+    } else if (strcmp(type, PR_RECOVERY) == 0) {
+        if (option->recovery_script_path != NULL) {
+            process_name = option->recovery_script_path;
+        }
+    }
+
     pid_t pid = fork();
     if (pid == -1) {
         perror("[ERROR](wrapper)");
         exit(1);
     } else if (pid == 0) {
+        if (fd_info[1] != STDOUT_FILENO) {
+            dup2(fd_info[1], STDOUT_FILENO);
+        }
+        if (fd_err[1] != STDERR_FILENO) {
+            dup2(fd_err[1], STDERR_FILENO);
+        }
+
         // INSPECTION PROCESS
         if (strcmp(type, PR_WRAPPER) == 0) {
             if (option->script_path != NULL) {
@@ -93,6 +128,32 @@ void make_wrapper(char* type) {
             }
         }
     } else {
+        int flags;
+        if ((flags = fcntl(fd_info[0], F_GETFL)) == -1) {
+            perror("[ERROR](wrapper)");
+            exit(3);
+        }
+        if (fcntl(fd_info[0], F_SETFL, flags | O_NONBLOCK | O_ASYNC) == -1) {
+            perror("[ERROR](wrapper)");
+            exit(3);
+        }
+
+        if ((flags = fcntl(fd_err[0], F_GETFL)) == -1) {
+            perror("[ERROR](wrapper)");
+            exit(3);
+        }
+        if (fcntl(fd_err[0], F_SETFL, flags | O_NONBLOCK | O_ASYNC) == -1) {
+            perror("[ERROR](wrapper)");
+            exit(3);
+        }
+
+        if (fd_info[0] != STDIN_FILENO) {
+            dup2(fd_info[0], STDIN_FILENO);
+        }
+        if (fd_err[0] != STDERR_FILENO) {
+            dup2(fd_err[0], STDERR_FILENO);
+        }
+
         // WRAPPER
         prctl(PR_SET_NAME, type, NULL, NULL, NULL);
 
@@ -108,12 +169,22 @@ void make_wrapper(char* type) {
         sigemptyset(&sigset_mask);
         sigaddset(&sigset_mask, SIGCHLD);
 
+        int n;
+        char buffer[256];
+
         FILE* heat_log;
+        FILE* log_file;
         if ((heat_log = fopen("heat.log", "a")) == NULL) {
             perror("[ERROR](wrapper)");
             exit(1);
         }
 
+        if ((log_file = fopen("heat.verbose.log", "a")) == NULL) {
+            perror("[ERROR](wrapper)");
+            exit(1);
+        }
+
+        time_t tt;
         while (1) {
             if ((signo = sigtimedwait(&sigset_mask, &info, &timeout)) == -1) {
                 if (errno == EAGAIN) {
@@ -124,8 +195,47 @@ void make_wrapper(char* type) {
                 exit(1);
             }
 
+            if (strcmp(type, PR_FAILURE) != 0) {
+                while (1) {
+                    n = read(fd_info[0], buffer, sizeof(buffer) - 1);
+                    if (n == -1) {
+                        if (errno != EAGAIN) {
+                            perror("[ERROR](wrapper)");
+                            continue;
+                        }
+                        break;
+                    } else if (n > 0) {
+                        time(&tt);
+                        buffer[n] = '\0';
+                        fprintf(log_file, "%d: INFO: %s\n", (unsigned int)(tt),
+                                process_name);
+                        fprintf(log_file, "%s\n", buffer);
+                        fflush(log_file);
+                    } else {
+                        break;
+                    }
+
+                    n = read(fd_err[0], buffer, sizeof(buffer) - 1);
+                    if (n == -1) {
+                        if (errno != EAGAIN) {
+                            perror("[ERROR](wrapper)");
+                            continue;
+                        }
+                        break;
+                    } else if (n > 0) {
+                        time(&tt);
+                        buffer[n] = '\0';
+                        fprintf(log_file, "%d: ERR: %s\n", (unsigned int)(tt),
+                                process_name);
+                        fprintf(log_file, "%s\n", buffer);
+                        fflush(log_file);
+                    } else {
+                        break;
+                    }
+                }
+            }
+
             if (signo == SIGCHLD) {
-                time_t tt;
                 time(&tt);
 
                 waitpid(pid, &status, 0);
@@ -152,6 +262,7 @@ void make_wrapper(char* type) {
             }
         }
 
+        fclose(log_file);
         fclose(heat_log);
         exit(WEXITSTATUS(status));
     }

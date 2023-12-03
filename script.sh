@@ -1,5 +1,4 @@
 #!/bin/bash
 
-# curl -sf localhost
-
-sleep 10
+echo SCRIPT
+curl -sf localhost

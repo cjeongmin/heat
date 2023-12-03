@@ -4,7 +4,7 @@ a.out
 test
 test.c
 .DS_Store
-heat.log
+heat.*
 
 ./build
 heat
