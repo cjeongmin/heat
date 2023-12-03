@@ -198,6 +198,9 @@ void heat_receiver() {
             if (info.si_status == 0) {
                 if (info.si_pid != failure_wrapper_pid &&
                     info.si_pid != recovery_wrapper_pid) {
+                    if (recovery_wrapper_pid != 0) {
+                        kill(option->pid, option->success_signal);
+                    }
                     failure_cnt = 0;
                     failure_wrapper_pid = 0;
                     recovery_wrapper_pid = 0;
@@ -274,6 +277,7 @@ void heat_receiver() {
                     }
                 } else {
                     if (option->recovery_script_path != NULL) {
+                        kill(option->pid, option->fault_signal);
                         if ((recovery_wrapper_pid = fork()) == -1) {
                             perror("[ERROR](receiver)");
                             exit(1);
