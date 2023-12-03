@@ -35,7 +35,7 @@ typedef struct HeatOption {
 
     int pid;
     int signal;
-    int threshold;
+    unsigned int threshold;
 
     char* failure_script_path;
 

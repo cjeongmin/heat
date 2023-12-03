@@ -83,6 +83,14 @@ void make_wrapper(char* type) {
                     exit(1);
                 }
             }
+        } else if (strcmp(type, PR_RECOVERY) == 0) {
+            if (option->recovery_script_path != NULL) {
+                if (execle(option->recovery_script_path,
+                           option->recovery_script_path, NULL, environ) == -1) {
+                    perror("[ERROR](wrapper)");
+                    exit(1);
+                }
+            }
         }
     } else {
         // WRAPPER
@@ -123,7 +131,8 @@ void make_wrapper(char* type) {
                 waitpid(pid, &status, 0);
 
                 if (status == 0) {
-                    if (strcmp(type, PR_FAILURE) != 0) {
+                    if (strcmp(type, PR_FAILURE) != 0 &&
+                        strcmp(type, PR_RECOVERY) != 0) {
                         printf("%d: OK\n", (unsigned int)tt);
                     }
                 } else {
@@ -162,6 +171,7 @@ void heat_receiver() {
     timeout.tv_sec = 0;
     timeout.tv_nsec = 100000; // 1ms
 
+    unsigned int recovery_cnt = 0;
     unsigned int failure_cnt = 0;
     time_t first_failure_time = 0;
     time_t latest_failure_time = 0;
@@ -183,20 +193,42 @@ void heat_receiver() {
         }
 
         if (signo == SIGCHLD) {
-            waitpid(-1, NULL, WNOHANG);
+            waitpid(-1, NULL, 0);
 
             if (info.si_status == 0) {
+                if (info.si_pid != failure_wrapper_pid &&
+                    info.si_pid != recovery_wrapper_pid) {
+                    failure_cnt = 0;
+                    failure_wrapper_pid = 0;
+                    recovery_wrapper_pid = 0;
+                } else if (info.si_pid == recovery_wrapper_pid) {
+                    if (info.si_status == 0) {
+                        if (option->recovery_timeout != 0) {
+                            // SET RECOVERY TIMEOUT TIMER
+                            struct itimerval timeout_timer;
+                            timeout_timer.it_value.tv_sec =
+                                option->recovery_timeout;
+                            timeout_timer.it_value.tv_usec = 0;
+                            timeout_timer.it_interval.tv_sec = 0;
+                            timeout_timer.it_interval.tv_usec = 0;
+
+                            if (setitimer(ITIMER_REAL, &timeout_timer, NULL) ==
+                                -1) {
+                                perror("[ERROR](receiver)");
+                                exit(1);
+                            }
+                        } else if (option->recovery_timeout == 0 &&
+                                   option->threshold != 0) {
+                            recovery_cnt = option->threshold;
+                        }
+                    }
+                }
             } else {
+                failure_cnt += 1;
+
                 time(&latest_failure_time);
                 if (first_failure_time == 0) {
                     first_failure_time = latest_failure_time;
-                }
-
-                if (option->pid != 0 && option->signal != -1) {
-                    if (kill(option->pid, option->signal) == -1) {
-                        perror("[ERROR](receiver)");
-                        exit(1);
-                    }
                 }
 
                 char buffer[128];
@@ -213,21 +245,61 @@ void heat_receiver() {
                 sprintf(buffer, "%d", failure_cnt);
                 setenv("HEAT_FAIL_CNT", buffer, 1);
 
-                if (option->failure_script_path != NULL) {
-                    if ((failure_wrapper_pid = fork()) == -1) {
+                recovery_cnt -= 1;
+                if (recovery_wrapper_pid != 0) {
+                    if (recovery_cnt != 0) {
+                        continue;
+                    }
+                }
+
+                if (option->pid != 0 && option->signal != -1) {
+                    if (kill(option->pid, option->signal) == -1) {
                         perror("[ERROR](receiver)");
                         exit(1);
                     }
+                }
 
-                    if (failure_wrapper_pid == 0) {
-                        make_wrapper(PR_FAILURE);
-                    } else {
-                        waitpid(failure_wrapper_pid, NULL, 0);
+                if (failure_cnt <= option->threshold) {
+                    if (option->failure_script_path != NULL) {
+                        if ((failure_wrapper_pid = fork()) == -1) {
+                            perror("[ERROR](receiver)");
+                            exit(1);
+                        }
+
+                        if (failure_wrapper_pid == 0) {
+                            make_wrapper(PR_FAILURE);
+                        } else {
+                            waitpid(failure_wrapper_pid, NULL, 0);
+                        }
+                    }
+                } else {
+                    if (option->recovery_script_path != NULL) {
+                        if ((recovery_wrapper_pid = fork()) == -1) {
+                            perror("[ERROR](receiver)");
+                            exit(1);
+                        }
+
+                        if (recovery_wrapper_pid == 0) {
+                            make_wrapper(PR_RECOVERY);
+                        } else {
+                            waitpid(recovery_wrapper_pid, NULL, 0);
+                        }
                     }
                 }
             }
         } else if (signo == SIGALRM) {
+            if (option->recovery_script_path != NULL) {
+                if ((recovery_wrapper_pid = fork()) == -1) {
+                    perror("[ERROR](receiver)");
+                    exit(1);
+                }
 
+                if (recovery_wrapper_pid == 0) {
+                    make_wrapper(PR_RECOVERY);
+                } else {
+                    waitpid(recovery_wrapper_pid, NULL, 0);
+                }
+            }
         } else if (signo == SIGUSR1 && allow_new_wrapper == 0) {
             pid = fork();
             if (pid == -1) {
