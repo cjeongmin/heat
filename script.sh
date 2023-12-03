@@ -1,3 +1,3 @@
 #!/bin/bash
 
-curl -sf localhost
+# curl -sf localhost

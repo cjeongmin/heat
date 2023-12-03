@@ -288,7 +288,8 @@ void heat_receiver() {
                 }
             }
         } else if (signo == SIGALRM) {
-            if (option->recovery_script_path != NULL) {
+            if (recovery_wrapper_pid != 0 &&
+                option->recovery_script_path != NULL) {
                 if ((recovery_wrapper_pid = fork()) == -1) {
                     perror("[ERROR](receiver)");
                     exit(1);
