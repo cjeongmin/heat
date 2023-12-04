@@ -234,6 +234,7 @@ void make_wrapper(char* type) {
             }
 
             if (strcmp(type, PR_FAILURE) != 0) {
+                int info_printed = 0;
                 while (1) {
                     n = read(fd_info[0], buffer, sizeof(buffer) - 1);
                     if (n == -1) {
@@ -243,16 +244,25 @@ void make_wrapper(char* type) {
                         }
                         break;
                     } else if (n > 0) {
-                        time(&tt);
+                        if (info_printed == 0) {
+                            info_printed = 1;
+                            time(&tt);
+                            fprintf(heat_verbose_log, "%d: INFO: %s\n",
+                                    (unsigned int)(tt), process_name);
+                        }
                         buffer[n] = '\0';
-                        fprintf(heat_verbose_log, "%d: INFO: %s\n",
-                                (unsigned int)(tt), process_name);
-                        fprintf(heat_verbose_log, "%s\n", buffer);
-                        fflush(heat_verbose_log);
+                        fprintf(heat_verbose_log, "%s", buffer);
                     } else {
                         break;
                     }
+                }
+                if (info_printed == 1) {
+                    fprintf(heat_verbose_log, "\n");
+                    fflush(heat_verbose_log);
+                }
 
+                info_printed = 0;
+                while (1) {
                     n = read(fd_err[0], buffer, sizeof(buffer) - 1);
                     if (n == -1) {
                         if (errno != EAGAIN) {
@@ -261,15 +271,21 @@ void make_wrapper(char* type) {
                         }
                         break;
                     } else if (n > 0) {
-                        time(&tt);
+                        if (info_printed == 0) {
+                            info_printed = 1;
+                            time(&tt);
+                            fprintf(heat_verbose_log, "%d: ERR: %s\n",
+                                    (unsigned int)(tt), process_name);
+                        }
                         buffer[n] = '\0';
-                        fprintf(heat_verbose_log, "%d: ERR: %s\n",
-                                (unsigned int)(tt), process_name);
-                        fprintf(heat_verbose_log, "%s\n", buffer);
-                        fflush(heat_verbose_log);
+                        fprintf(heat_verbose_log, "%s", buffer);
                     } else {
                         break;
                     }
+                }
+                if (info_printed == 1) {
+                    fprintf(heat_verbose_log, "\n");
+                    fflush(heat_verbose_log);
                 }
             }
 
