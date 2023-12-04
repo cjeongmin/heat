@@ -188,6 +188,8 @@ int get_signal(char* signal) {
     while (*pointer != NULL) {
         if (strcmp(*pointer, signal) == 0) {
             return cnt;
+        } else if (strcmp(*pointer + 3, signal) == 0) {
+            return cnt;
         }
         pointer++;
         cnt++;
