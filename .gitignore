@@ -8,3 +8,5 @@ heat.*
 
 ./build
 heat
+
+node_modules
