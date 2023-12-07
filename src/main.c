@@ -233,60 +233,58 @@ void make_wrapper(char* type) {
                 exit(1);
             }
 
-            if (strcmp(type, PR_FAILURE) != 0) {
-                int info_printed = 0;
-                while (1) {
-                    n = read(fd_info[0], buffer, sizeof(buffer) - 1);
-                    if (n == -1) {
-                        if (errno != EAGAIN) {
-                            perror("[ERROR](wrapper)");
-                            continue;
-                        }
-                        break;
-                    } else if (n > 0) {
-                        if (info_printed == 0) {
-                            info_printed = 1;
-                            time(&tt);
-                            fprintf(heat_verbose_log, "%d: INFO: %s\n",
-                                    (unsigned int)(tt), process_name);
-                        }
-                        buffer[n] = '\0';
-                        fprintf(heat_verbose_log, "%s", buffer);
-                    } else {
-                        break;
+            int info_printed = 0;
+            while (1) {
+                n = read(fd_info[0], buffer, sizeof(buffer) - 1);
+                if (n == -1) {
+                    if (errno != EAGAIN) {
+                        perror("[ERROR](wrapper)");
+                        continue;
                     }
+                    break;
+                } else if (n > 0) {
+                    if (info_printed == 0) {
+                        info_printed = 1;
+                        time(&tt);
+                        fprintf(heat_verbose_log, "%d: INFO: %s\n",
+                                (unsigned int)(tt), process_name);
+                    }
+                    buffer[n] = '\0';
+                    fprintf(heat_verbose_log, "%s", buffer);
+                } else {
+                    break;
                 }
-                if (info_printed == 1) {
-                    fprintf(heat_verbose_log, "\n");
-                    fflush(heat_verbose_log);
-                }
+            }
+            if (info_printed == 1) {
+                fprintf(heat_verbose_log, "\n");
+                fflush(heat_verbose_log);
+            }
 
-                info_printed = 0;
-                while (1) {
-                    n = read(fd_err[0], buffer, sizeof(buffer) - 1);
-                    if (n == -1) {
-                        if (errno != EAGAIN) {
-                            perror("[ERROR](wrapper)");
-                            continue;
-                        }
-                        break;
-                    } else if (n > 0) {
-                        if (info_printed == 0) {
-                            info_printed = 1;
-                            time(&tt);
-                            fprintf(heat_verbose_log, "%d: ERR: %s\n",
-                                    (unsigned int)(tt), process_name);
-                        }
-                        buffer[n] = '\0';
-                        fprintf(heat_verbose_log, "%s", buffer);
-                    } else {
-                        break;
+            info_printed = 0;
+            while (1) {
+                n = read(fd_err[0], buffer, sizeof(buffer) - 1);
+                if (n == -1) {
+                    if (errno != EAGAIN) {
+                        perror("[ERROR](wrapper)");
+                        continue;
                     }
+                    break;
+                } else if (n > 0) {
+                    if (info_printed == 0) {
+                        info_printed = 1;
+                        time(&tt);
+                        fprintf(heat_verbose_log, "%d: ERR: %s\n",
+                                (unsigned int)(tt), process_name);
+                    }
+                    buffer[n] = '\0';
+                    fprintf(heat_verbose_log, "%s", buffer);
+                } else {
+                    break;
                 }
-                if (info_printed == 1) {
-                    fprintf(heat_verbose_log, "\n");
-                    fflush(heat_verbose_log);
-                }
+            }
+            if (info_printed == 1) {
+                fprintf(heat_verbose_log, "\n");
+                fflush(heat_verbose_log);
             }
 
             if (signo == SIGCHLD) {
@@ -340,6 +338,8 @@ void heat_receiver() {
     unsigned int failure_cnt = 0;
     time_t first_failure_time = 0;
     time_t latest_failure_time = 0;
+
+    int wait_timeout = 0;
 
     prctl(PR_SET_NAME, "heat-receiver", NULL, NULL, NULL);
 
@@ -398,6 +398,8 @@ void heat_receiver() {
                                 perror("[ERROR](receiver)");
                                 exit(1);
                             }
+
+                            wait_timeout = 1;
                         } else if (option->recovery_timeout == 0 &&
                                    option->threshold != 0) {
                             recovery_cnt = option->threshold;
@@ -440,7 +442,37 @@ void heat_receiver() {
                     }
                 }
 
-                if (failure_cnt <= option->threshold) {
+                if (option->threshold > 0) {
+                    if (failure_cnt <= option->threshold) {
+                        if (option->failure_script_path != NULL) {
+                            if ((failure_wrapper_pid = fork()) == -1) {
+                                perror("[ERROR](receiver)");
+                                exit(1);
+                            }
+
+                            if (failure_wrapper_pid == 0) {
+                                make_wrapper(PR_FAILURE);
+                            } else {
+                                waitpid(failure_wrapper_pid, NULL, 0);
+                            }
+                        }
+                    } else {
+                        if (wait_timeout == 0 &&
+                            option->recovery_script_path != NULL) {
+                            kill(option->pid, option->fault_signal);
+                            if ((recovery_wrapper_pid = fork()) == -1) {
+                                perror("[ERROR](receiver)");
+                                exit(1);
+                            }
+
+                            if (recovery_wrapper_pid == 0) {
+                                make_wrapper(PR_RECOVERY);
+                            } else {
+                                waitpid(recovery_wrapper_pid, NULL, 0);
+                            }
+                        }
+                    }
+                } else {
                     if (option->failure_script_path != NULL) {
                         if ((failure_wrapper_pid = fork()) == -1) {
                             perror("[ERROR](receiver)");
@@ -453,23 +485,10 @@ void heat_receiver() {
                             waitpid(failure_wrapper_pid, NULL, 0);
                         }
                     }
-                } else {
-                    if (option->recovery_script_path != NULL) {
-                        kill(option->pid, option->fault_signal);
-                        if ((recovery_wrapper_pid = fork()) == -1) {
-                            perror("[ERROR](receiver)");
-                            exit(1);
-                        }
-
-                        if (recovery_wrapper_pid == 0) {
-                            make_wrapper(PR_RECOVERY);
-                        } else {
-                            waitpid(recovery_wrapper_pid, NULL, 0);
-                        }
-                    }
                 }
             }
         } else if (signo == SIGALRM) {
+            wait_timeout = 0;
             if (recovery_wrapper_pid != 0 &&
                 option->recovery_script_path != NULL) {
                 if ((recovery_wrapper_pid = fork()) == -1) {
